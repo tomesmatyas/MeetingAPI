@@ -20,6 +20,7 @@
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = "User";
     }
     public class MeetingDetailDto
     {
@@ -56,7 +57,7 @@
         public int CreatedByUserId { get; set; }
         public UserDto? CreatedByUser { get; set; }
 
-        public List<UserDto> Participants { get; set; } = new();
+        public List<MeetingParticipantDto> Participants { get; set; } = new();
     }
 
     public class MeetingRecurrenceDto
@@ -75,17 +76,30 @@
 
     public class CreateUserDto
     {
-        public string Username { get; set; } = string.Empty;
-        public string PasswordHash { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
+        public string Username { get; set; } = "";
+        public string PasswordHash { get; set; } = "";
+        public string Email { get; set; } = "";
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
     }
+
 
     public class UpdateUserDto
     {
         public string Email { get; set; } = string.Empty;
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
+        public int Id { get; set; }
+    }
+    public class LoginDto
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    public class LoginResponseDto
+    {
+        public string Token { get; set; } = string.Empty;
+        public UserDto User { get; set; } = new();
     }
 }

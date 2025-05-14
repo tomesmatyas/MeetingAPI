@@ -24,6 +24,7 @@ namespace MeetingAPI.Models
 
         public ICollection<Meeting> CreatedMeetings { get; set; } = new List<Meeting>();
         public ICollection<MeetingParticipant> Participations { get; set; } = new List<MeetingParticipant>();
+        public string Role { get; set; } = "User";  // ✅ př
     }
 
     public class MeetingRecurrence

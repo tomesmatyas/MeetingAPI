@@ -4,8 +4,13 @@ using MeetingAPI.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
-namespace MeetingAPI.Controllers;
+namespace MeetingAPI.Controllers { 
 
 [ApiController]
 [Route("api/[controller]")]
@@ -44,7 +49,7 @@ public class MeetingsController : ControllerBase
         if (meeting == null) return NotFound();
         return Ok(_mapper.Map<MeetingDto>(meeting));
     }
-
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<MeetingDto>> CreateMeeting(MeetingDto meetingDto)
     {
@@ -63,7 +68,7 @@ public class MeetingsController : ControllerBase
         var resultDto = _mapper.Map<MeetingDto>(meeting);
         return CreatedAtAction(nameof(GetMeetingById), new { id = resultDto.Id }, resultDto);
     }
-
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateMeeting(int id, MeetingDto dto)
     {
@@ -92,7 +97,7 @@ public class MeetingsController : ControllerBase
             if (existingMeeting.Recurrence == null)
             {
                 existingMeeting.Recurrence = new MeetingRecurrence();
-                _context.Recurrences.Add(existingMeeting.Recurrence);
+                _context.MeetingRecurrences.Add(existingMeeting.Recurrence);
             }
 
             existingMeeting.Recurrence.Pattern = dto.Recurrence.Pattern;
@@ -211,6 +216,7 @@ public class UsersController : ControllerBase
         return Ok(_mapper.Map<IEnumerable<UserDto>>(users));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("{id}")]
     public async Task<ActionResult<UserDto>> GetUserById(int id)
     {
@@ -219,7 +225,7 @@ public class UsersController : ControllerBase
 
         return Ok(_mapper.Map<UserDto>(user));
     }
-
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<UserDto>> CreateUser(CreateUserDto dto)
     {
@@ -230,7 +236,7 @@ public class UsersController : ControllerBase
 
         return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, _mapper.Map<UserDto>(user));
     }
-
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(int id, UpdateUserDto dto)
     {
@@ -246,7 +252,7 @@ public class UsersController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
-
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
@@ -256,5 +262,103 @@ public class UsersController : ControllerBase
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
         return NoContent();
+    } 
+}
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly AppDbContext _context;
+    private readonly IConfiguration _config;
+
+    public AuthController(AppDbContext context, IConfiguration config)
+    {
+        _context = context;
+        _config = config;
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(LoginDto dto)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
+        if (user == null || user.PasswordHash != dto.Password) // POZOR: nezabezpečeno!
+            return Unauthorized();
+
+        var token = GenerateJwtToken(user);
+        return Ok(new LoginResponseDto
+        {
+            Token = token,
+            User = new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName
+            }
+        });
+    }
+        [HttpPost("register")]
+        public async Task<IActionResult> Register(CreateUserDto dto)
+        {
+            if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
+                return Conflict("Uživatel již existuje.");
+
+            var user = new User
+            {
+                Username = dto.Username,
+                PasswordHash = dto.PasswordHash, // ❗️ Později zašifrovat!
+                Email = dto.Email,
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Role = "User"
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> Me()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Unauthorized();
+
+            var user = await _context.Users.FindAsync(int.Parse(userId));
+            if (user == null) return NotFound();
+
+            return Ok(new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName
+            });
+        }
+
+
+        private string GenerateJwtToken(User user)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+    new Claim(ClaimTypes.Name, user.Username),
+    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+    new Claim(ClaimTypes.Role, user.Role)
+};
+
+        var token = new JwtSecurityToken(
+            claims: claims,
+            expires: DateTime.Now.AddDays(7),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
+} 
