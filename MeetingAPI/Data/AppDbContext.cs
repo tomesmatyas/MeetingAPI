@@ -1,5 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MeetingAPI.Models;
+﻿using MeetingAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace MeetingAPI.Data
 {
