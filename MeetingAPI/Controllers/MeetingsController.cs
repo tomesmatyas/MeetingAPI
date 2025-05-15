@@ -24,11 +24,16 @@ public class MeetingsController : ControllerBase
         _context = context;
         _mapper = mapper;
     }
-
-    [HttpGet]
+        [Authorize]
+        [HttpGet]
     public async Task<ActionResult<IEnumerable<MeetingDto>>> GetMeetings()
     {
-        var meetings = await _context.Meetings
+            Console.WriteLine($" Authenticated: {User.Identity?.IsAuthenticated}");
+            Console.WriteLine($"User: {User.Identity?.Name}");
+
+            foreach (var c in User.Claims)
+                Console.WriteLine($" Claim: {c.Type} = {c.Value}");
+            var meetings = await _context.Meetings
             .Include(m => m.Recurrence)
             .Include(m => m.Participants).ThenInclude(mp => mp.User)
             .Include(m => m.CreatedByUser)
@@ -36,8 +41,8 @@ public class MeetingsController : ControllerBase
 
         return Ok(_mapper.Map<List<MeetingDto>>(meetings));
     }
-
-    [HttpGet("{id}")]
+        [Authorize]
+        [HttpGet("{id}")]
     public async Task<ActionResult<MeetingDto>> GetMeetingById(int id)
     {
         var meeting = await _context.Meetings
@@ -113,8 +118,8 @@ public class MeetingsController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
-
-    [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteMeeting(int id)
     {
         var meeting = await _context.Meetings.FindAsync(id);
@@ -124,8 +129,8 @@ public class MeetingsController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
-
-    [HttpPost("{meetingId}/users/{userId}")]
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{meetingId}/users/{userId}")]
     public async Task<IActionResult> AddParticipant(int meetingId, int userId)
     {
         var meeting = await _context.Meetings.FindAsync(meetingId);
@@ -143,8 +148,8 @@ public class MeetingsController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok();
     }
-
-    [HttpGet("{meetingId}/participants")]
+        [Authorize]
+        [HttpGet("{meetingId}/participants")]
     public async Task<ActionResult<IEnumerable<UserDto>>> GetParticipants(int meetingId)
     {
         var users = await _context.MeetingParticipants
@@ -155,8 +160,8 @@ public class MeetingsController : ControllerBase
 
         return Ok(_mapper.Map<List<UserDto>>(users));
     }
-
-    [HttpDelete("{meetingId}/users/{userId}")]
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("{meetingId}/users/{userId}")]
     public async Task<IActionResult> RemoveParticipant(int meetingId, int userId)
     {
         var link = await _context.MeetingParticipants
@@ -168,8 +173,8 @@ public class MeetingsController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
-
-    [HttpPost("{meetingId}/participants")]
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{meetingId}/participants")]
     public async Task<IActionResult> AddParticipantViaBody(int meetingId, [FromBody] MeetingParticipantDto data)
     {
         var user = await _context.Users.FindAsync(data.UserId);
@@ -342,23 +347,32 @@ public class AuthController : ControllerBase
 
 
         private string GenerateJwtToken(User user)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
         {
-    new Claim(ClaimTypes.Name, user.Username),
-    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-    new Claim(ClaimTypes.Role, user.Role)
-};
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var token = new JwtSecurityToken(
-            claims: claims,
-            expires: DateTime.Now.AddDays(7),
-            signingCredentials: creds);
+            var claims = new[]
+                            {
+                        new Claim(ClaimTypes.Name, user.Username),
+                        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                        new Claim(ClaimTypes.Role, user.Role),
+                        new Claim("role", user.Role)
+                            };
+            Console.WriteLine($"[LOGIN] Uživatelské jméno: {user.Username}");
+            Console.WriteLine($"[LOGIN] Role: {user.Role}");
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            foreach (var c in claims)
+                Console.WriteLine($"[LOGIN] Claim: {c.Type} = {c.Value}");
+
+            var token = new JwtSecurityToken(
+                    issuer: _config["Jwt:Issuer"],
+                    audience: _config["Jwt:Audience"],
+                    claims: claims,
+                    expires: DateTime.UtcNow.AddDays(7),
+                    signingCredentials: creds
+                    );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
     }
-}
 } 

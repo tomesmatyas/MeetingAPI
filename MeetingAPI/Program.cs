@@ -21,13 +21,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new()
         {
             ValidateIssuer = false,
-            ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+
+           
         };
     });
+var key = builder.Configuration["Jwt:Key"];
+Console.WriteLine($" Jwt:Key = {key}");
+Console.WriteLine($" Jwt:Issuer = {builder.Configuration["Jwt:Issuer"]}");
+Console.WriteLine($" Jwt:Audience = {builder.Configuration["Jwt:Audience"]}");
 // Pøidání databázového kontextu
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -42,9 +49,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+app.UseAuthentication();    
+app.UseAuthorization();     
 app.MapControllers();
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.Run();
