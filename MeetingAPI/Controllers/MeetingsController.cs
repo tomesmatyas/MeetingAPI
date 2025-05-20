@@ -54,70 +54,89 @@ public class MeetingsController : ControllerBase
         if (meeting == null) return NotFound();
         return Ok(_mapper.Map<MeetingDto>(meeting));
     }
-    [Authorize(Roles = "Admin")]
-    [HttpPost]
-    public async Task<ActionResult<MeetingDto>> CreateMeeting(MeetingDto meetingDto)
-    {
-        var meeting = _mapper.Map<Meeting>(meetingDto);
-
-        if (meeting.EndTime <= meeting.StartTime)
-            return BadRequest("EndTime must be after StartTime.");
-
-        if (meeting.CreatedByUserId == 0)
-            return BadRequest("Missing CreatedByUserId.");
-
-        meeting.CreatedAt = DateTime.UtcNow;
-        _context.Meetings.Add(meeting);
-        await _context.SaveChangesAsync();
-
-        var resultDto = _mapper.Map<MeetingDto>(meeting);
-        return CreatedAtAction(nameof(GetMeetingById), new { id = resultDto.Id }, resultDto);
-    }
-    [Authorize(Roles = "Admin")]
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateMeeting(int id, MeetingDto dto)
-    {
-        if (id != dto.Id) return BadRequest();
-
-        var existingMeeting = await _context.Meetings
-            .Include(m => m.Recurrence)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
-        if (existingMeeting == null) return NotFound();
-
-        if (dto.EndTime <= dto.StartTime)
-            return BadRequest("EndTime must be after StartTime.");
-
-        existingMeeting.Title = dto.Title;
-        existingMeeting.Date = dto.Date;
-        existingMeeting.StartTime = dto.StartTime;
-        existingMeeting.EndTime = dto.EndTime;
-        existingMeeting.ColorHex = dto.ColorHex;
-        existingMeeting.IsRegular = dto.IsRegular;
-        existingMeeting.EndDate = dto.EndDate;
-        existingMeeting.UpdatedAt = DateTime.UtcNow;
-
-        if (dto.IsRegular && dto.Recurrence != null)
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<ActionResult<MeetingDto>> CreateMeeting(MeetingDto meetingDto)
         {
-            if (existingMeeting.Recurrence == null)
+            var meeting = _mapper.Map<Meeting>(meetingDto);
+
+            if (meeting.EndTime <= meeting.StartTime)
+                return BadRequest("EndTime must be after StartTime.");
+
+            if (meeting.CreatedByUserId == 0)
+                return BadRequest("Missing CreatedByUserId.");
+
+            meeting.CreatedAt = DateTime.UtcNow;
+            _context.Meetings.Add(meeting);
+            await _context.SaveChangesAsync(); 
+            if (meetingDto.Participants?.Any() == true)
             {
-                existingMeeting.Recurrence = new MeetingRecurrence();
-                _context.MeetingRecurrences.Add(existingMeeting.Recurrence);
+                foreach (var p in meetingDto.Participants)
+                {
+                    _context.MeetingParticipants.Add(new MeetingParticipant
+                    {
+                        MeetingId = meeting.Id,
+                        UserId = p.UserId
+                    });
+                }
+                await _context.SaveChangesAsync();
             }
 
-            existingMeeting.Recurrence.Pattern = dto.Recurrence.Pattern;
-            existingMeeting.Recurrence.Interval = dto.Recurrence.Interval;
-            existingMeeting.RecurrenceId = dto.Recurrence.Id;
+            var resultDto = _mapper.Map<MeetingDto>(meeting);
+            return CreatedAtAction(nameof(GetMeetingById), new { id = resultDto.Id }, resultDto);
         }
-        else
+        [Authorize(Roles = "Admin")]
+    [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateMeeting(int id, MeetingDto dto)
         {
-            existingMeeting.RecurrenceId = null;
-            existingMeeting.Recurrence = null;
-        }
+            if (id != dto.Id) return BadRequest();
 
-        await _context.SaveChangesAsync();
-        return NoContent();
-    }
+            var existingMeeting = await _context.Meetings
+                .Include(m => m.Recurrence)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (existingMeeting == null) return NotFound();
+
+            if (dto.EndTime <= dto.StartTime)
+                return BadRequest("EndTime must be after StartTime.");
+
+            existingMeeting.Title = dto.Title;
+            existingMeeting.Date = dto.Date;
+            existingMeeting.StartTime = dto.StartTime;
+            existingMeeting.EndTime = dto.EndTime;
+            existingMeeting.ColorHex = dto.ColorHex;
+            existingMeeting.IsRegular = dto.IsRegular;
+            existingMeeting.EndDate = dto.EndDate;
+            existingMeeting.UpdatedAt = DateTime.UtcNow;
+
+            if (dto.IsRegular && dto.Recurrence != null)
+            {
+                if (existingMeeting.Recurrence == null)
+                {
+                    existingMeeting.Recurrence = new MeetingRecurrence();
+                    _context.MeetingRecurrences.Add(existingMeeting.Recurrence);
+                }
+
+                existingMeeting.Recurrence.Pattern = dto.Recurrence.Pattern;
+                existingMeeting.Recurrence.Interval = dto.Recurrence.Interval;
+
+                // ❗ NEPŘIŘAZUJ RecurrenceId RUČNĚ
+                // EF Core si to automaticky propojí přes navigation property
+            }
+            else
+            {
+                // ❗ Odstranění Recurrence pokud se už nehodí
+                if (existingMeeting.Recurrence != null)
+                    _context.MeetingRecurrences.Remove(existingMeeting.Recurrence);
+
+                existingMeeting.Recurrence = null;
+                existingMeeting.RecurrenceId = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    
         [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteMeeting(int id)
