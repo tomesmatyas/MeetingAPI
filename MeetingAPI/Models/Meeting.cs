@@ -22,10 +22,26 @@ namespace MeetingAPI.Models
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
 
+        public string Role { get; set; } = "User";
+
         public ICollection<Meeting> CreatedMeetings { get; set; } = new List<Meeting>();
         public ICollection<MeetingParticipant> Participations { get; set; } = new List<MeetingParticipant>();
-        public string Role { get; set; } = "User";  // ✅ př
+
+        // Pro vazbu admin-user
+        public ICollection<AdminUser> AdminOfUsers { get; set; } = new List<AdminUser>();
+        public ICollection<AdminUser> UserOfAdmins { get; set; } = new List<AdminUser>();
     }
+
+    public class AdminUser
+    {
+        public int AdminId { get; set; }
+        public User Admin { get; set; } = null!;
+
+        public int UserId { get; set; }
+        public User User { get; set; } = null!;
+    }
+
+
 
     public class MeetingRecurrence
     {
@@ -36,10 +52,9 @@ namespace MeetingAPI.Models
         [RegularExpression("None|Weekly|Monthly")]
         public string Pattern { get; set; } = "None";
 
-        public int Interval { get; set; } = 1;
-
         public ICollection<Meeting> Meetings { get; set; } = new List<Meeting>();
     }
+
 
     public class Meeting
     {
@@ -65,6 +80,8 @@ namespace MeetingAPI.Models
         public string? ColorHex { get; set; }
 
         public bool IsRegular { get; set; }
+
+        public int? Interval { get; set; } = 1;
 
         public int? RecurrenceId { get; set; }
         public MeetingRecurrence? Recurrence { get; set; }

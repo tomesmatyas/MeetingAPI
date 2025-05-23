@@ -11,6 +11,7 @@ namespace MeetingAPI.Data
         public DbSet<User> Users { get; set; }
         public DbSet<MeetingRecurrence> MeetingRecurrences { get; set; }
         public DbSet<MeetingParticipant> MeetingParticipants { get; set; }
+        public DbSet<AdminUser> AdminUsers { get; set; }   // NOVĚ!
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -61,6 +62,27 @@ namespace MeetingAPI.Data
                 .WithMany(r => r.Meetings)
                 .HasForeignKey(m => m.RecurrenceId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Meeting: Interval defaultně 1
+            modelBuilder.Entity<Meeting>()
+                .Property(m => m.Interval)
+                .HasDefaultValue(1);
+
+            // AdminUser: složený klíč a vztahy
+            modelBuilder.Entity<AdminUser>()
+                .HasKey(au => new { au.AdminId, au.UserId });
+
+            modelBuilder.Entity<AdminUser>()
+                .HasOne(au => au.Admin)
+                .WithMany(u => u.AdminOfUsers)
+                .HasForeignKey(au => au.AdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AdminUser>()
+                .HasOne(au => au.User)
+                .WithMany(u => u.UserOfAdmins)
+                .HasForeignKey(au => au.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

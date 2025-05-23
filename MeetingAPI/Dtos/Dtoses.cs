@@ -1,6 +1,6 @@
 ﻿namespace MeetingAPI.Dtos
 {
-    
+
     public class CreateMeetingDto
     {
         public string Title { get; set; } = string.Empty;
@@ -9,9 +9,11 @@
         public TimeSpan EndTime { get; set; }
         public string? ColorHex { get; set; }
         public bool IsRegular { get; set; }
-        public string? Pattern { get; set; } = "None";
+        public int? RecurrenceId { get; set; }  // volitelné, lepší RecurrenceId
+        public int? Interval { get; set; } = 1;        // NOVĚ!      // nově můžeš předat i RecurrenceId
         public DateTime? EndDate { get; set; }
         public int CreatedByUserId { get; set; }
+        public List<int>? Participants { get; set; }
     }
     public class UserDto
     {
@@ -32,8 +34,9 @@
         public DateTime? EndDate { get; set; }
         public string? ColorHex { get; set; }
         public bool IsRegular { get; set; }
+        public int? Interval { get; set; } = 1;
         public string? RecurrencePattern { get; set; }
-        public int? Interval { get; set; }
+        public int? RecurrenceId { get; set; }
         public List<UserDto> Participants { get; set; } = new();
     }
     public class UpdateMeetingDto : CreateMeetingDto
@@ -54,6 +57,8 @@
         public int? RecurrenceId { get; set; }
         public MeetingRecurrenceDto? Recurrence { get; set; }
 
+        public int? Interval { get; set; } = 1; // přidej zde
+
         public int CreatedByUserId { get; set; }
         public UserDto? CreatedByUser { get; set; }
 
@@ -64,7 +69,7 @@
     {
         public int Id { get; set; }
         public string Pattern { get; set; } = "None";
-        public int Interval { get; set; } = 1;
+       
     }
 
     public class MeetingParticipantDto
